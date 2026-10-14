@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#047857">
+<title>LandTech 2026 · P2 – Deed &amp; Ownership Verification</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style type="text/tailwindcss">
+  @layer components {
+    .card { @apply rounded-2xl bg-white border border-slate-200 shadow-sm p-5; }
+    .lbl { @apply block text-sm font-semibold text-slate-700 mb-1; }
+    .field { @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500; }
+    .btn-primary { @apply inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold bg-emerald-700 text-white hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50; }
+    .btn-ghost { @apply inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50; }
+    .btn-danger { @apply inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold bg-red-700 text-white hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50; }
+  }
+</style>
+<style>
+  .hash { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+  .diff { background: #fde047; color: #7f1d1d; font-weight: 700; border-radius: 2px; }
+</style>
+</head>
+
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+<div class="bg-slate-900 text-slate-200 text-xs text-center py-1.5 px-3">
+  HACKATHON PROTOTYPE · 100% synthetic data · Not an official government system
+</div>
+
+<header class="bg-gradient-to-r from-emerald-800 to-emerald-700 text-white shadow">
+  <div class="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
+    <svg viewBox="0 0 60 36" class="w-12 h-8 rounded shadow shrink-0" aria-hidden="true">
+      <rect width="60" height="36" fill="#006a4e"/><circle cx="27" cy="18" r="10" fill="#f42a41"/>
+    </svg>
+    <div>
+      <p class="text-[11px] uppercase tracking-widest text-emerald-200">Digital Land Records · Bangladesh</p>
+      <h1 class="text-lg sm:text-2xl font-bold leading-tight">LandTech 2026 · P2 — Deed &amp; Ownership Verification</h1>
+      <p class="text-sm text-emerald-100">দলিল ও মালিকানা যাচাই</p>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-4xl w-full mx-auto px-4 py-6 flex-1">
+
+  <div id="cryptoWarn" class="hidden mb-4 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm p-3" role="alert">
+    Web Crypto (<code>crypto.subtle</code>) is unavailable. Open this page over <b>HTTPS</b> (e.g. your Vercel URL) or <b>localhost</b>.
+  </div>
+
+  <!-- Tabs -->
+  <div role="tablist" aria-label="Portals" class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
+    <button id="tab-issue" role="tab" aria-selected="true" aria-controls="panel-issue" type="button">Sub-Registry Portal (Issue &amp; Stamp)</button>
+    <button id="tab-verify" role="tab" aria-selected="false" aria-controls="panel-verify" type="button">Public Citizen Portal (Verify Deed)</button>
+  </div>
+
+  <!-- ============ ISSUE PANEL ============ -->
+  <section id="panel-issue" role="tabpanel" aria-labelledby="tab-issue" class="space-y-5">
+
+    <div class="card">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <h2 class="text-lg font-bold text-emerald-800">1 · Deed particulars</h2>
+        <button type="button" id="fillSample" class="btn-ghost">Fill Sample Synthetic Data</button>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-4">
+        <div><label class="lbl" for="mouza">Mouza</label><input id="mouza" class="field" autocomplete="off" placeholder="e.g. Dhanmondi"></div>
+        <div><label class="lbl" for="khatian">Khatian No</label><input id="khatian" class="field" autocomplete="off" placeholder="e.g. RS-4092"></div>
+        <div><label class="lbl" for="dag">Dag / Plot No</label><input id="dag" class="field" autocomplete="off" placeholder="e.g. 1104"></div>
+        <div><label class="lbl" for="owner">Owner Name</label><input id="owner" class="field" autocomplete="off" placeholder="Synthetic owner name"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="text-lg font-bold text-emerald-800 mb-1">2 · Deed document</h2>
+      <p class="text-sm text-slate-500 mb-3">Upload a PDF or image. The SHA-256 fingerprint is computed in your browser; the file never leaves your device.</p>
+      <input type="file" id="issueFile" accept=".pdf,application/pdf,image/*"
+        class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800">
+      <div class="mt-3"><button type="button" id="issueSampleFile" class="btn-ghost">Use built-in synthetic deed</button></div>
+
+      <div id="issueFileInfo" class="hidden mt-4 rounded-lg bg-slate-50 border border-slate-200 p-3">
+        <p id="issueFileName" class="text-sm font-semibold text-slate-700 break-words"></p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-2">SHA-256</p>
+        <p id="issueHash" class="hash text-xs sm:text-sm text-slate-800"></p>
+      </div>
+
+      <div class="mt-5"><button type="button" id="issueBtn" class="btn-primary w-full sm:w-auto">Issue &amp; Stamp Deed</button></div>
+      <div id="issueMsg" class="hidden" role="status" aria-live="polite"></div>
+    </div>
+
+    <div id="issueResult" class="hidden card border-emerald-300">
+      <h2 class="text-lg font-bold text-emerald-800 mb-4">3 · Stamped deed (scan to verify)</h2>
+      <div class="grid md:grid-cols-[auto,1fr] gap-6 items-start">
+        <div class="flex flex-col items-center gap-3">
+          <div id="qrBox" class="bg-white p-3 rounded-xl border border-slate-200"></div>
+          <button type="button" id="dlQr" class="btn-ghost">Download QR Stamp (PNG)</button>
+        </div>
+        <div class="min-w-0">
+          <dl id="resultDetails" class="space-y-3"></dl>
+          <div class="mt-4">
+            <label class="lbl" for="verifyUrl">Verification link (encoded in the QR)</label>
+            <div class="flex gap-2">
+              <input id="verifyUrl" class="field text-xs" readonly>
+              <button type="button" id="copyUrl" class="btn-ghost shrink-0">Copy</button>
+            </div>
+            <a id="openLink" target="_blank" rel="noopener" class="inline-block mt-2 text-sm font-semibold text-emerald-700 underline">Open verification link</a>
+          </div>
+          <p id="fileWarn" class="hidden mt-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3">
+            This page was opened from <code>file://</code>. The QR will not work on another device. Deploy it (e.g. Vercel) and open the https URL.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div id="recordsCard" class="hidden card">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-bold text-emerald-800">Ledger on this device</h2>
+        <button type="button" id="clearRecords" class="btn-ghost">Clear all</button>
+      </div>
+      <div id="recordsList"></div>
+    </div>
+  </section>
+
+  <!-- ============ VERIFY PANEL ============ -->
+  <section id="panel-verify" role="tabpanel" aria-labelledby="tab-verify" class="hidden space-y-5">
+
+    <div id="qrResult" class="hidden"></div>
+
+    <div class="card">
+      <h2 class="text-lg font-bold text-emerald-800 mb-1">Check a deed file</h2>
+      <p class="text-sm text-slate-500 mb-3">Upload the deed you were given. Its SHA-256 fingerprint is computed on your device and compared with the official record.</p>
+      <p id="compareNote" class="hidden mb-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm p-2"></p>
+      <input type="file" id="verifyFile" accept=".pdf,application/pdf,image/*"
+        class="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-700 file:px-4 file:py-2.5 file:text-sm file:font-semibold file:text-white hover:file:bg-emerald-800">
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button type="button" id="verifySampleFile" class="btn-ghost">Use built-in sample deed</button>
+        <button type="button" id="tamperBtn" class="btn-danger">Test Tampered File</button>
+      </div>
+      <p class="text-xs text-slate-500 mt-2">“Test Tampered File” flips one byte of the file above (or the issued / sample deed) and re-hashes it.</p>
+
+      <div id="verifyFileInfo" class="hidden mt-4 rounded-lg bg-slate-50 border border-slate-200 p-3">
+        <p id="verifyFileName" class="text-sm font-semibold text-slate-700 break-words"></p>
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 mt-2">SHA-256</p>
+        <p id="verifyHash" class="hash text-xs sm:text-sm text-slate-800"></p>
+      </div>
+      <div id="verifyMsg" class="hidden" role="status" aria-live="polite"></div>
+    </div>
+
+    <div id="verifyResult" class="hidden"></div>
+  </section>
+</main>
+
+<footer class="bg-slate-800 text-slate-300 text-xs">
+  <div class="max-w-4xl mx-auto px-4 py-4 space-y-1">
+    <p><b class="text-white">Team Draft Zero (LA-134)</b> · LandTech 2026 · Track: Digital Land Records, Verification &amp; Digitization</p>
+    <p>Demo trust model: the QR link carries the claim (hash, Khatian, owner). A production system must carry a digital signature from the Sub-Registry key and check it on verification. See README.</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- constants & state ---------- */
+const STORE_KEY = 'landtech2026.p2.records';
+const MAX_BYTES = 25 * 1024 * 1024;
+const SAMPLE = { mouza: 'Dhanmondi', khatian: 'RS-4092', dag: '1104', owner: 'Md. Rahim Uddin - Synthetic Record' };
+const HASH_RE = /^[a-f0-9]{64}$/;
+const hasCrypto = !!(window.crypto && window.crypto.subtle);
+const state = { issue: null, verify: null, session: null, urlRef: null };
+
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+
+/* ---------- helpers ---------- */
+const fmtBytes = (n) => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : (n / 1048576).toFixed(2) + ' MB';
+const fmtDate = (iso) => { try { return new Date(iso).toLocaleString('en-GB'); } catch (e) { return iso; } };
+const shortHash = (h) => h.slice(0, 16) + '…' + h.slice(-8);
+const hex2 = (n) => n.toString(16).padStart(2, '0');
+
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result);
+    fr.onerror = () => reject(fr.error || new Error('Could not read the file.'));
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+async function sha256(arrayBuffer) {
+  const digest = await window.crypto.subtle.digest('SHA-256', arrayBuffer);
+  return Array.from(new Uint8Array(digest)).map(hex2).join('');
+}
+
+function sampleDeedBytes() {
+  const text = [
+    'SYNTHETIC SALE DEED - HACKATHON DEMO ONLY',
+    'Mouza: ' + SAMPLE.mouza,
+    'Khatian No: ' + SAMPLE.khatian,
+    'Dag/Plot No: ' + SAMPLE.dag,
+    'Owner: ' + SAMPLE.owner,
+    'This document contains 100% synthetic data.'
+  ].join('\n');
+  const u8 = new TextEncoder().encode(text);
+  return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+}
+
+function diffCount(a, b) {
+  let n = 0;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) n++;
+  return n;
+}
+
+function renderHash(container, hash, other) {
+  container.textContent = '';
+  for (let i = 0; i < hash.length; i++) {
+    if (other && other[i] !== hash[i]) container.appendChild(el('span', 'diff', hash[i]));
+    else container.appendChild(document.createTextNode(hash[i]));
+  }
+}
+
+function notify(id, kind, text) {
+  const n = $(id);
+  n.textContent = text || '';
+  const tone = {
+    ok: 'bg-emerald-50 text-emerald-800 border border-emerald-200',
+    err: 'bg-red-50 text-red-800 border border-red-200',
+    info: 'bg-slate-50 text-slate-700 border border-slate-200'
+  }[kind] || '';
+  n.className = text ? 'mt-3 rounded-lg px-3 py-2 text-sm font-medium ' + tone : 'hidden';
+}
+
+async function copyText(text, btn) {
+  const old = btn.textContent;
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const t = document.createElement('textarea');
+    t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); } catch (_) {}
+    t.remove();
+  }
+  btn.textContent = 'Copied';
+  setTimeout(() => { btn.textContent = old; }, 1400);
+}
+
+/* ---------- storage (localStorage, failure-tolerant) ---------- */
+function loadRecords() {
+  try {
+    const r = JSON.parse(localStorage.getItem(STORE_KEY) || '[]');
+    return Array.isArray(r) ? r : [];
+  } catch (e) { return []; }
+}
+function saveRecords(list) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); return true; }
+  catch (e) { return false; }
+}
+
+/* ---------- tabs ---------- */
+const TAB_BASE = 'rounded-xl px-4 py-3 text-sm sm:text-base font-semibold border transition focus:outline-none focus:ring-2 focus:ring-emerald-500 ';
+const TAB_ON = 'bg-emerald-700 text-white border-emerald-700 shadow';
+const TAB_OFF = 'bg-white text-slate-700 border-slate-300 hover:bg-emerald-50';
+function showTab(name) {
+  ['issue', 'verify'].forEach((n) => {
+    const on = n === name;
+    $('tab-' + n).setAttribute('aria-selected', String(on));
+    $('tab-' + n).className = TAB_BASE + (on ? TAB_ON : TAB_OFF);
+    $('panel-' + n).classList.toggle('hidden', !on);
+  });
+}
+
+/* ---------- verification URL (cross-device payload) ---------- */
+function baseUrl() {
+  return location.protocol === 'file:'
+    ? location.href.split(/[?#]/)[0]
+    : window.location.origin + window.location.pathname;
+}
+function verifyUrl(r) {
+  return baseUrl() + '?verify=1&hash=' + r.hash +
+    '&khatian=' + encodeURIComponent(r.khatian) +
+    '&owner=' + encodeURIComponent(r.owner);
+}
+
+/* ---------- file loading (shared by both portals) ---------- */
+async function loadFile(kind, name, buf) {
+  if (!hasCrypto) throw new Error('Web Crypto is unavailable. Open this page over HTTPS or localhost.');
+  if (buf.byteLength > MAX_BYTES) throw new Error('File is larger than 25 MB.');
+  const hash = await sha256(buf);
+  state[kind] = { name, bytes: buf, hash };
+  $(kind + 'FileInfo').classList.remove('hidden');
+  $(kind + 'FileName').textContent = name + ' · ' + fmtBytes(buf.byteLength);
+  $(kind + 'Hash').textContent = hash;
+  return state[kind];
+}
+
+/* =====================  ISSUE PORTAL  ===================== */
+$('fillSample').addEventListener('click', () => {
+  Object.keys(SAMPLE).forEach((k) => { $(k).value = SAMPLE[k]; });
+});
+
+$('issueFile').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  try {
+    notify('issueMsg', 'info', 'Computing SHA-256…');
+    await loadFile('issue', f.name, await readFile(f));
+    notify('issueMsg', 'ok', 'SHA-256 computed from the real file bytes.');
+  } catch (err) { notify('issueMsg', 'err', err.message); }
+});
+
+$('issueSampleFile').addEventListener('click', async () => {
+  try {
+    await loadFile('issue', 'synthetic-deed-sample.txt', sampleDeedBytes());
+    notify('issueMsg', 'ok', 'Built-in synthetic deed loaded and hashed.');
+  } catch (err) { notify('issueMsg', 'err', err.message); }
+});
+
+$('issueBtn').addEventListener('click', () => {
+  const rec = {
+    mouza: $('mouza').value.trim(),
+    khatian: $('khatian').value.trim(),
+    dag: $('dag').value.trim(),
+    owner: $('owner').value.trim()
+  };
+  if (!rec.mouza || !rec.khatian || !rec.dag || !rec.owner) {
+    return notify('issueMsg', 'err', 'Fill all four fields (or tap “Fill Sample Synthetic Data”).');
+  }
+  if (!state.issue) return notify('issueMsg', 'err', 'Upload a deed file (or use the built-in synthetic deed) first.');
+
+  rec.hash = state.issue.hash;
+  rec.fileName = state.issue.name;
+  rec.issuedAt = new Date().toISOString();
+
+  const list = loadRecords().filter((r) => r.hash !== rec.hash);
+  list.unshift(rec);
+  const saved = saveRecords(list);
+  state.session = Object.assign({}, rec, { bytes: state.issue.bytes });
+
+  renderIssueResult(rec);
+  renderRecords();
+  notify('issueMsg', saved ? 'ok' : 'info',
+    saved ? 'Deed stamped and saved to this device’s ledger.' : 'Deed stamped for this session (browser storage unavailable).');
+  $('issueResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+function renderIssueResult(rec) {
+  const url = verifyUrl(rec);
+  $('issueResult').classList.remove('hidden');
+
+  const box = $('qrBox');
+  box.textContent = '';
+  try {
+    new QRCode(box, {
+      text: url, width: 240, height: 240,
+      colorDark: '#0f172a', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } catch (e) { box.textContent = 'QR generation failed: ' + e.message; }
+
+  const dl = $('resultDetails');
+  dl.textContent = '';
+  [['Mouza', rec.mouza], ['Khatian No', rec.khatian], ['Dag / Plot No', rec.dag],
+   ['Owner', rec.owner], ['SHA-256', rec.hash, true], ['Issued', fmtDate(rec.issuedAt)]
+  ].forEach(([k, v, mono]) => {
+    const w = el('div');
+    w.append(
+      el('dt', 'text-xs font-semibold uppercase tracking-wide text-slate-500', k),
+      el('dd', 'text-sm text-slate-800 break-words' + (mono ? ' hash' : ''), v)
+    );
+    dl.append(w);
+  });
+
+  $('verifyUrl').value = url;
+  $('openLink').href = url;
+  $('fileWarn').classList.toggle('hidden', location.protocol !== 'file:');
+}
+
+$('copyUrl').addEventListener('click', (e) => copyText($('verifyUrl').value, e.currentTarget));
+$('dlQr').addEventListener('click', () => {
+  const c = $('qrBox').querySelector('canvas');
+  if (!c) return;
+  const a = document.createElement('a');
+  a.download = 'deed-qr-stamp.png';
+  a.href = c.toDataURL('image/png');
+  a.click();
+});
+
+function renderRecords() {
+  const list = loadRecords();
+  const body = $('recordsList');
+  body.textContent = '';
+  $('recordsCard').classList.toggle('hidden', list.length === 0);
+  list.forEach((r) => {
+    const row = el('div', 'flex items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0');
+    const info = el('div', 'min-w-0');
+    info.append(
+      el('p', 'font-semibold text-slate-800 truncate', r.owner),
+      el('p', 'text-xs text-slate-500', 'Khatian ' + r.khatian + ' · Dag ' + r.dag + ' · ' + fmtDate(r.issuedAt)),
+      el('p', 'text-xs hash text-slate-400', shortHash(r.hash))
+    );
+    const b = el('button', 'btn-ghost shrink-0', 'Show QR');
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      renderIssueResult(r);
+      $('issueResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    row.append(info, b);
+    body.append(row);
+  });
+}
+$('clearRecords').addEventListener('click', () => {
+  if (!confirm('Delete all records stored on this device?')) return;
+  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  renderRecords();
+});
+
+/* =====================  VERIFY PORTAL  ===================== */
+
+/* --- QR landing: ?verify=1&hash=...&khatian=...&owner=... --- */
+function initFromUrl() {
+  const p = new URLSearchParams(location.search);
+  if (p.get('verify') !== '1') return;
+  showTab('verify');
+  const hash = (p.get('hash') || '').toLowerCase();
+  const khatian = (p.get('khatian') || '').slice(0, 120);
+  const owner = (p.get('owner') || '').slice(0, 240);
+  const host = $('qrResult');
+  host.classList.remove('hidden');
+  host.textContent = '';
+
+  if (!HASH_RE.test(hash) || !khatian || !owner) {
+    const c = el('div', 'rounded-2xl border-4 border-amber-300 bg-amber-100 text-amber-900 p-5');
+    c.append(el('h2', 'text-xl font-extrabold', 'INVALID OR INCOMPLETE VERIFICATION LINK'),
+             el('p', 'mt-1 text-sm', 'The link is missing a valid SHA-256 hash, Khatian number or owner name. Do not treat this deed as verified.'));
+    host.append(c);
+    return;
+  }
+
+  state.urlRef = { hash, khatian, owner };
+  const local = loadRecords().find((r) => r.hash === hash);
+
+  const c = el('div', 'rounded-2xl border-4 border-emerald-300 bg-emerald-700 text-white p-5 shadow-lg');
+  const head = el('div', 'flex items-center gap-3');
+  head.innerHTML = '<svg viewBox="0 0 24 24" class="w-10 h-10 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-7"/></svg>';
+  head.append(el('h2', 'text-2xl sm:text-3xl font-extrabold leading-tight', 'AUTHENTICATED OFFICIAL DEED'));
+  c.append(head);
+  c.append(infoRow('Owner', owner, false, 'ok'), infoRow('Khatian No', khatian, false, 'ok'));
+  const hw = infoRow('SHA-256', '', true, 'ok');
+  hw.lastChild.textContent = hash;
+  c.append(hw);
+  c.append(el('p', 'mt-4 text-sm text-emerald-100',
+    local ? '✔ Also found in this device’s Sub-Registry ledger (issued ' + fmtDate(local.issuedAt) + ').'
+          : 'Details were read from the QR link. This device holds no ledger copy (expected when scanning from another device).'));
+  c.append(el('p', 'mt-1 text-sm text-emerald-100', 'Next: upload the deed file below to confirm it matches this fingerprint.'));
+  host.append(c);
+
+  const note = $('compareNote');
+  note.textContent = 'Files will be compared against the deed from the scanned QR (Khatian ' + khatian + ').';
+  note.classList.remove('hidden');
+}
+
+/* --- result renderers --- */
+function infoRow(label, value, mono, tone) {
+  const w = el('div', 'mt-3');
+  w.append(
+    el('div', 'text-xs font-semibold uppercase tracking-wide ' + (tone === 'ok' ? 'text-emerald-200' : 'text-red-200'), label),
+    el('div', 'font-semibold break-words ' + (mono ? 'hash text-sm' : 'text-base sm:text-lg'), value)
+  );
+  return w;
+}
+function hashBlock(label, hash, other) {
+  const w = el('div', 'mt-4');
+  w.append(el('div', 'text-xs font-semibold uppercase tracking-wide text-red-100', label));
+  const b = el('div', 'hash text-xs sm:text-sm bg-black/30 rounded-lg p-3 mt-1');
+  renderHash(b, hash, other);
+  w.append(b);
+  return w;
+}
+function resetResult() {
+  const out = $('verifyResult');
+  out.textContent = '';
+  out.classList.remove('hidden');
+  return out;
+}
+function showMatch(computed, ref) {
+  const out = resetResult();
+  const c = el('div', 'rounded-2xl border-4 border-emerald-300 bg-emerald-700 text-white p-5 shadow-lg');
+  c.append(el('h3', 'text-xl sm:text-2xl font-extrabold', '✔ FILE MATCHES OFFICIAL RECORD'),
+           el('p', 'mt-1 text-sm text-emerald-100', 'Matched against: ' + ref.source));
+  c.append(infoRow('Owner', ref.owner, false, 'ok'), infoRow('Khatian No', ref.khatian, false, 'ok'), infoRow('SHA-256 (computed)', computed, true, 'ok'));
+  out.append(c);
+  out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function showForged(computed, expected, source, note) {
+  const out = resetResult();
+  const c = el('div', 'rounded-2xl border-4 border-red-300 bg-red-700 text-white p-5 shadow-xl');
+  c.setAttribute('role', 'alert');
+  const h = el('h3', 'text-xl sm:text-2xl font-extrabold leading-tight');
+  h.append(el('span', 'mr-2', '⚠'), document.createTextNode('WARNING: FORGED OR ALTERED DEED DETECTED'));
+  c.append(h);
+  c.append(el('p', 'mt-2 text-sm text-red-50', 'The SHA-256 fingerprint of this file does not match the registered record. Do not rely on this document.'));
+  if (note) c.append(el('p', 'mt-2 text-sm text-yellow-200 font-medium', note));
+  c.append(hashBlock('Registered hash · ' + source, expected, computed));
+  c.append(hashBlock('Hash of the file provided', computed, expected));
+  c.append(el('p', 'mt-3 text-sm font-semibold', diffCount(expected, computed) + ' of 64 hex characters differ (highlighted).'));
+  out.append(c);
+  out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function showNoRef(computed) {
+  const out = resetResult();
+  const c = el('div', 'rounded-2xl border-4 border-amber-300 bg-amber-100 text-amber-900 p-5');
+  c.append(el('h3', 'text-xl font-extrabold', 'NO OFFICIAL RECORD TO COMPARE AGAINST'),
+           el('p', 'mt-1 text-sm', 'Scan a deed’s QR code, or issue a deed on this device first. Computed fingerprint:'),
+           el('p', 'mt-2 hash text-xs sm:text-sm', computed));
+  out.append(c);
+}
+
+/* --- comparison logic --- */
+function collectRefs() {
+  if (state.urlRef) return [Object.assign({}, state.urlRef, { source: 'scanned QR link' })];
+  const refs = [];
+  if (state.session) refs.push({ hash: state.session.hash, owner: state.session.owner, khatian: state.session.khatian, source: 'deed issued in this session' });
+  loadRecords().forEach((r) => {
+    if (!refs.some((x) => x.hash === r.hash)) refs.push({ hash: r.hash, owner: r.owner, khatian: r.khatian, source: 'this device’s ledger (localStorage)' });
+  });
+  return refs;
+}
+function runVerify() {
+  const v = state.verify;
+  if (!v) return;
+  const refs = collectRefs();
+  if (!refs.length) return showNoRef(v.hash);
+  const hit = refs.find((r) => r.hash === v.hash);
+  if (hit) return showMatch(v.hash, hit);
+  showForged(v.hash, refs[0].hash, refs[0].source,
+    refs.length > 1 ? 'Compared against ' + refs.length + ' registered records; none matched.' : '');
+}
+
+$('verifyFile').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  try {
+    notify('verifyMsg', 'info', 'Computing SHA-256…');
+    await loadFile('verify', f.name, await readFile(f));
+    notify('verifyMsg', '', '');
+    runVerify();
+  } catch (err) { notify('verifyMsg', 'err', err.message); }
+});
+
+$('verifySampleFile').addEventListener('click', async () => {
+  try {
+    await loadFile('verify', 'synthetic-deed-sample.txt', sampleDeedBytes());
+    notify('verifyMsg', '', '');
+    runVerify();
+  } catch (err) { notify('verifyMsg', 'err', err.message); }
+});
+
+/* --- tamper simulation: flip one byte, re-hash, compare --- */
+$('tamperBtn').addEventListener('click', async () => {
+  try {
+    if (!hasCrypto) throw new Error('Web Crypto is unavailable. Open this page over HTTPS or localhost.');
+    let source, label;
+    if (state.verify) { source = state.verify.bytes; label = 'uploaded file “' + state.verify.name + '”'; }
+    else if (state.session) { source = state.session.bytes; label = 'deed issued in this session'; }
+    else { source = sampleDeedBytes(); label = 'built-in synthetic sample deed'; }
+    if (!source.byteLength) throw new Error('The file is empty, so there is no byte to alter.');
+
+    const originalHash = await sha256(source);
+    const u8 = new Uint8Array(source.slice(0));
+    const idx = Math.floor(u8.length / 2);
+    const before = u8[idx];
+    u8[idx] = before ^ 0x01;
+    const tamperedHash = await sha256(u8.buffer);
+
+    notify('verifyMsg', '', '');
+    showForged(tamperedHash, originalHash, 'original file',
+      'Simulation on ' + label + ': byte #' + idx + ' altered (0x' + hex2(before) + ' → 0x' + hex2(u8[idx]) + ').');
+  } catch (err) { notify('verifyMsg', 'err', err.message); }
+});
+
+/* ---------- boot ---------- */
+$('tab-issue').addEventListener('click', () => showTab('issue'));
+$('tab-verify').addEventListener('click', () => showTab('verify'));
+showTab('issue');
+if (!hasCrypto) $('cryptoWarn').classList.remove('hidden');
+renderRecords();
+initFromUrl();
+})();
+</script>
+</body>
+</html>
